@@ -210,7 +210,7 @@ class MonitorManager:
             candidate=candidate,
             live_start_time=live_start,
             record_danmaku=bool(row.get("record_danmaku", 1)),
-            auto_convert_mp4=bool(row.get("auto_convert_mp4", 1)),
+            auto_convert_mp4=bool(row.get("auto_convert_mp4", 0)),
             split_mode=row.get("split_mode", "none"),
             split_arg=int(row.get("split_arg", 0) or 0),
         )

@@ -31,7 +31,7 @@ def _popen_kwargs() -> dict:
 
 
 class VideoRecorder:
-    """单个 ffmpeg 子进程：从直播流 URL 直录为 TS 文件。"""
+    """单个 ffmpeg 子进程：从直播流 URL 直录为 FLV 文件。"""
 
     def __init__(self, url: str, output_path: Path,
                  headers: Optional[dict[str, str]] = None):
@@ -60,7 +60,7 @@ class VideoRecorder:
             "-reconnect_delay_max", "10",
             "-i", self.url,
             "-c", "copy",
-            "-f", "mpegts",
+            "-f", "flv",
             "-y",
             str(self.output_path),
         ]
@@ -125,24 +125,6 @@ class VideoRecorder:
         if self._pump:
             self._pump.cancel()
         return self.return_code or 0
-
-
-async def remux_ts_to_mp4(ts_path: Path, mp4_path: Path) -> bool:
-    cmd = [
-        ffmpeg_bin(), "-hide_banner", "-loglevel", "error",
-        "-y", "-i", str(ts_path),
-        "-c", "copy",
-        "-movflags", "+faststart",
-        str(mp4_path),
-    ]
-    proc = await asyncio.create_subprocess_exec(
-        *cmd, stdout=asyncio.subprocess.DEVNULL,
-        stderr=asyncio.subprocess.DEVNULL)
-    code = await proc.wait()
-    if code != 0 or not mp4_path.exists():
-        mp4_path.unlink(missing_ok=True)
-        return False
-    return True
 
 
 async def remux_flv_to_mp4(flv_path: Path, mp4_path: Path) -> bool:

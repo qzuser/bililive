@@ -115,11 +115,12 @@ rid = _db.add_room(9527001, name="测试主播", title="测试标题", quality=1
 _db.update_room(9527001, enabled=0, record_danmaku=0)
 row = _db.get_room(9527001)
 check("db room roundtrip", row["enabled"] == 0 and row["record_danmaku"] == 0
-      and row["title"] == "测试标题")
+      and row["title"] == "测试标题"
+      and row["auto_convert_mp4"] == 0)  # 新房间默认不自动转 MP4
 check("db 分段字段 roundtrip", row["split_mode"] == "time"
       and row["split_arg"] == 30)
 rec_pk = _db.add_recording(9527001, "测试标题", 1000.0,
-                           "recordings/room9527001/a.ts")
+                           "recordings/room9527001/a.flv")
 _db.finish_recording(rec_pk, status="completed", end_ts=2000.0, size=123,
                      video_file="recordings/room9527001/a.mp4",
                      danmaku_count=7)
@@ -198,11 +199,11 @@ sp.split_mode = "none"
 check("分段-none 不触发", sp._split_due() is False)
 szs = RecordingSession.__new__(RecordingSession)
 szs.split_mode, szs.split_arg = "size", 1
-szs.ts_path = Path(_cfg.DATA_DIR) / "big.ts"
+szs.flv_path = Path(_cfg.DATA_DIR) / "big.flv"
 check("分段-size 模式无文件不误触发", not szs._split_due())
-szs.ts_path.write_bytes(b"0" * (1024 * 1024 + 1))
+szs.flv_path.write_bytes(b"0" * (1024 * 1024 + 1))
 check("分段-按大小到期触发", szs._split_due())
-szs.ts_path.unlink()
+szs.flv_path.unlink()
 
 _db.close()
 

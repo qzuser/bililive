@@ -11,7 +11,7 @@ from xml.sax.saxutils import quoteattr
 from .. import config, db
 from ..bilibili.api import BiliLiveAPI, StreamCandidate
 from ..bilibili.danmaku import DanmakuClient
-from .recorder import VideoRecorder, remux_ts_to_mp4
+from .recorder import VideoRecorder, remux_flv_to_mp4
 
 log = logging.getLogger("session")
 
@@ -41,7 +41,7 @@ class RecordingSession:
         self.split_arg = max(0, int(split_arg or 0))
 
         self.dir = config.RECORDINGS_DIR / f"room{room_id}"
-        self.ts_path = self.dir / "pending.ts"
+        self.flv_path = self.dir / "pending.flv"
         self.xml_path = self.dir / "pending.xml"
         self.events_path = self.dir / "pending.events.jsonl"
         self.mp4_path = self.dir / "pending.mp4"
@@ -77,19 +77,19 @@ class RecordingSession:
         stem = f"{stamp}_{safe_filename(self.title)}"
         if self._seg_index > 1:
             stem = f"{stem}_p{self._seg_index:02d}"
-        return (self.dir / f"{stem}.ts", self.dir / f"{stem}.xml",
+        return (self.dir / f"{stem}.flv", self.dir / f"{stem}.xml",
                 self.dir / f"{stem}.events.jsonl", self.dir / f"{stem}.mp4")
 
     def _open_segment(self) -> None:
         self._seg_index += 1
-        (self.ts_path, self.xml_path, self.events_path,
+        (self.flv_path, self.xml_path, self.events_path,
          self.mp4_path) = self._segment_paths()
         self.dir.mkdir(parents=True, exist_ok=True)
         self.segment_started_at = time.time()
         self.danmaku_count = 0
         self.recording_id = db.add_recording(
             self.room_id, self.title, self.segment_started_at,
-            video_file=str(self.ts_path.relative_to(config.DATA_DIR)))
+            video_file=str(self.flv_path.relative_to(config.DATA_DIR)))
         if self.record_danmaku:
             self._xml_fh = open(self.xml_path, "w", encoding="utf-8")
             self._xml_fh.write('<?xml version="1.0" encoding="UTF-8"?>\n<i>\n')
@@ -123,20 +123,20 @@ class RecordingSession:
         self._events_fh = None
         return {
             "recording_id": self.recording_id,
-            "ts_path": self.ts_path, "xml_path": self.xml_path,
+            "flv_path": self.flv_path, "xml_path": self.xml_path,
             "events_path": self.events_path, "mp4_path": self.mp4_path,
             "danmaku_count": self.danmaku_count,
         }
 
     async def _finish_segment(self, seg: dict) -> int:
         """转封装并回写数据库，返回该分段最终大小。"""
-        ts, mp4 = seg["ts_path"], seg["mp4_path"]
-        video_file = str(ts.relative_to(config.DATA_DIR))
-        final_size = ts.stat().st_size if ts.exists() else 0
+        flv, mp4 = seg["flv_path"], seg["mp4_path"]
+        video_file = str(flv.relative_to(config.DATA_DIR))
+        final_size = flv.stat().st_size if flv.exists() else 0
         if self.auto_convert_mp4 and final_size > 0:
-            ok = await remux_ts_to_mp4(ts, mp4)
+            ok = await remux_flv_to_mp4(flv, mp4)
             if ok:
-                ts.unlink(missing_ok=True)
+                flv.unlink(missing_ok=True)
                 video_file = str(mp4.relative_to(config.DATA_DIR))
                 final_size = mp4.stat().st_size
         if final_size > 0:
@@ -157,7 +157,7 @@ class RecordingSession:
     async def start(self) -> None:
         self._open_segment()
         self._recorder = VideoRecorder(
-            self.candidate.url, self.ts_path, self._build_headers())
+            self.candidate.url, self.flv_path, self._build_headers())
         try:
             await self._recorder.start()
         except (FileNotFoundError, OSError) as e:
@@ -173,7 +173,7 @@ class RecordingSession:
             self._split_task = asyncio.create_task(self._split_loop())
         self.status = "recording"
         log.info("session started room=%s -> %s (split=%s/%s)",
-                 self.room_id, self.ts_path, self.split_mode, self.split_arg)
+                 self.room_id, self.flv_path, self.split_mode, self.split_arg)
 
     def request_stop(self) -> None:
         self.stop_requested = True
@@ -189,7 +189,7 @@ class RecordingSession:
                     >= self.split_arg * 60)
         if self.split_mode == "size":
             try:
-                sz = self.ts_path.stat().st_size if self.ts_path.exists() else 0
+                sz = self.flv_path.stat().st_size if self.flv_path.exists() else 0
             except OSError:
                 return False
             return sz >= self.split_arg * 1024 * 1024
@@ -210,7 +210,7 @@ class RecordingSession:
             seg = await self._close_segment()
             self._open_segment()
             self._recorder = VideoRecorder(
-                self.candidate.url, self.ts_path, self._build_headers())
+                self.candidate.url, self.flv_path, self._build_headers())
             try:
                 await self._recorder.start()
             except Exception:

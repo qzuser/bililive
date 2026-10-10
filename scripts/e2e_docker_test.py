@@ -22,7 +22,7 @@ sys.path.insert(0, os.environ.get("BLR_WORK",
 from app import config, db  # noqa: E402
 from app.bilibili.api import BiliLiveAPI  # noqa: E402
 from app.bilibili.danmaku import DanmakuClient  # noqa: E402
-from app.core.recorder import VideoRecorder, remux_ts_to_mp4  # noqa: E402
+from app.core.recorder import VideoRecorder, remux_flv_to_mp4  # noqa: E402
 from app.core.session import RecordingSession  # noqa: E402
 
 RECORD_SECONDS = 30
@@ -62,7 +62,7 @@ async def main() -> int:
         return 1
     url = flv[0].url
     print(f"recording flv qn={flv[0].quality} host={urlparse(url).hostname}")
-    out = config.RECORDINGS_DIR / f"e2e_{room_id}.ts"
+    out = config.RECORDINGS_DIR / f"e2e_{room_id}.flv"
     headers = {"User-Agent": config.USER_AGENT,
                "Referer": f"https://live.bilibili.com/{room_id}"}
     rec = VideoRecorder(url, out, headers)
@@ -75,16 +75,20 @@ async def main() -> int:
         stopped = True
         await rec.stop()
     dur = time.time() - t0
-    ts_size = out.stat().st_size if out.exists() else 0
-    print(f"ts recorded: {ts_size} bytes in {dur:.1f}s "
+    flv_size = out.stat().st_size if out.exists() else 0
+    magic = out.read_bytes()[:3] if flv_size >= 3 else b""
+    print(f"flv recorded: {flv_size} bytes in {dur:.1f}s "
           f"({'timed stop' if stopped else 'ffmpeg exited early'})")
-    if ts_size < 100_000:
-        print("FAIL: ts too small, stream record broken")
+    if flv_size < 100_000:
+        print("FAIL: flv too small, stream record broken")
         print("stderr:", rec.error_hint())
+        return 1
+    if magic != b"FLV":
+        print(f"FAIL: not an FLV container, header={magic!r}")
         return 1
 
     mp4 = config.RECORDINGS_DIR / f"e2e_{room_id}.mp4"
-    ok = await remux_ts_to_mp4(out, mp4)
+    ok = await remux_flv_to_mp4(out, mp4)
     mp4_size = mp4.stat().st_size if ok else 0
     print(f"remux mp4: {'OK' if ok else 'FAIL'} {mp4_size} bytes")
     if not ok:

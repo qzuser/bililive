@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     quality INTEGER NOT NULL DEFAULT 10000,
     enabled INTEGER NOT NULL DEFAULT 1,
     record_danmaku INTEGER NOT NULL DEFAULT 1,
-    auto_convert_mp4 INTEGER NOT NULL DEFAULT 1,
+    auto_convert_mp4 INTEGER NOT NULL DEFAULT 0,
     split_mode TEXT NOT NULL DEFAULT 'none',
     split_arg INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL
@@ -64,6 +64,16 @@ def _migrate() -> None:
             _conn.execute(f"ALTER TABLE rooms ADD COLUMN {col} {ddl}")
         except sqlite3.OperationalError:
             pass
+    # 一次性迁移：自动转 MP4 改为默认关闭，存量房间保留 FLV 原始格式
+    row = _conn.execute(
+        "SELECT value FROM settings WHERE key='flv_default_off_mig'"
+    ).fetchone()
+    if not row:
+        _conn.execute(
+            "UPDATE rooms SET auto_convert_mp4=0 WHERE auto_convert_mp4=1")
+        _conn.execute(
+            "INSERT OR REPLACE INTO settings(key,value) "
+            "VALUES('flv_default_off_mig','1')")
 
 
 def close() -> None:
@@ -109,7 +119,7 @@ def add_room(room_id: int, name: str = "", title: str = "", cover: str = "",
     cur = _execute(
         "INSERT OR REPLACE INTO rooms(room_id,name,title,cover,quality,enabled,"
         "record_danmaku,auto_convert_mp4,split_mode,split_arg,created_at) "
-        "VALUES(?,?,?,?,?,1,1,1,?,?,?)",
+        "VALUES(?,?,?,?,?,1,1,0,?,?,?)",
         (room_id, name, title, cover, quality, split_mode, split_arg,
          time.time()),
     )
