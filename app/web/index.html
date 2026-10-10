@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B站直播录制系统</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">B站直播录制系统</div>
+  <div class="header-right">
+    <span id="status-bar" class="status-bar">加载中…</span>
+    <button id="btn-settings" class="btn">⚙ 设置</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="rooms">直播间</button>
+  <button class="tab" data-tab="recordings">录制记录</button>
+</nav>
+
+<main>
+  <section id="page-rooms">
+    <div class="toolbar">
+      <input id="new-room-input" type="text" placeholder="房间号或直播间链接">
+      <select id="new-room-quality">
+        <option value="0">自动(最高)</option>
+        <option value="20000">4K</option>
+        <option value="10000" selected>原画</option>
+        <option value="400">蓝光</option>
+        <option value="250">超清</option>
+        <option value="150">高清</option>
+      </select>
+      <button id="btn-add-room" class="btn primary">+ 添加监控</button>
+      <span id="add-room-msg" class="msg"></span>
+    </div>
+    <table class="list">
+      <thead>
+        <tr>
+          <th>房间</th><th>标题</th><th>状态</th><th>画质</th>
+          <th>弹幕</th><th>监控</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="rooms-tbody"></tbody>
+    </table>
+    <div id="rooms-empty" class="empty hidden">暂无直播间，请先添加</div>
+  </section>
+
+  <section id="page-recordings" class="hidden">
+    <table class="list">
+      <thead>
+        <tr>
+          <th>ID</th><th>房间</th><th>标题</th><th>开始</th><th>时长</th>
+          <th>大小</th><th>弹幕</th><th>状态</th><th>文件</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="recordings-tbody"></tbody>
+    </table>
+    <div id="recordings-empty" class="empty hidden">暂无录制记录</div>
+    <div class="pager">
+      <button id="btn-prev" class="btn">上一页</button>
+      <span id="page-info"></span>
+      <button id="btn-next" class="btn">下一页</button>
+    </div>
+  </section>
+</main>
+
+<div id="modal-settings" class="modal hidden">
+  <div class="modal-box">
+    <h3>系统设置</h3>
+    <label>B站登录 Cookie（登录后可录制原画/4K 高画质）
+      <textarea id="set-cookie" rows="5" placeholder="SESSDATA=...; bili_jct=...; DedeUserID=..."></textarea>
+    </label>
+    <div class="row">
+      <button id="btn-cookie-check" class="btn">检测登录状态</button>
+      <span id="cookie-status" class="msg"></span>
+    </div>
+    <label>轮询间隔（秒）
+      <input id="set-poll-interval" type="number" min="10" max="300" style="width:90px">
+    </label>
+    <label>新房间默认分段方式
+      <span class="inline">
+        <select id="set-default-split-mode" style="width:130px">
+          <option value="none">不分段</option>
+          <option value="time">按时间（分钟）</option>
+          <option value="size">按大小（MB）</option>
+        </select>
+        <input id="set-default-split-arg" type="number" min="1" style="width:90px" placeholder="值">
+      </span>
+    </label>
+    <label class="chk"><input id="set-daemon-warn" type="checkbox" disabled> （预留）开播站内提醒</label>
+    <div class="row end">
+      <button id="btn-save-settings" class="btn primary">保存</button>
+      <button id="btn-close-settings" class="btn">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-room" class="modal hidden">
+  <div class="modal-box">
+    <h3>录制设置 <span id="room-config-id" class="sub"></span></h3>
+    <label>画质
+      <select id="room-quality">
+        <option value="0">自动(最高)</option>
+        <option value="20000">4K</option>
+        <option value="10000">原画</option>
+        <option value="400">蓝光</option>
+        <option value="250">超清</option>
+        <option value="150">高清</option>
+      </select>
+    </label>
+    <label>分段方式
+      <span class="inline">
+        <select id="room-split-mode" style="width:150px">
+          <option value="none">不分段（整场一个文件）</option>
+          <option value="time">按时间切分</option>
+          <option value="size">按大小切分</option>
+        </select>
+        <input id="room-split-arg" type="number" min="1" style="width:90px">
+        <span id="room-split-unit" class="sub">分钟</span>
+      </span>
+    </label>
+    <label class="chk"><input id="room-danmaku" type="checkbox"> 录制弹幕</label>
+    <label class="chk"><input id="room-convert" type="checkbox"> 自动转 MP4</label>
+    <p class="sub">分段设置在下一次开始录制时生效（正在进行的录制不打断）。</p>
+    <div class="row end">
+      <button id="btn-save-room" class="btn primary">保存</button>
+      <button id="btn-close-room" class="btn">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

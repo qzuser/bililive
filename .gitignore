@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+data/
+data_e2e/
+data_win_test/
+.ref_bilitools/
+.env

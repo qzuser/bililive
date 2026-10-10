@@ -1,0 +1,15 @@
+services:
+  bilivilive:
+    build: .
+    image: bilivilive-recorder:latest
+    container_name: bilivilive-recorder
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # 视频与数据库保存目录：改为本机 NAS 存储路径
+      - ./data:/data
+    environment:
+      - TZ=Asia/Shanghai
+      - BLR_DATA_DIR=/data
+      - BLR_POLL_INTERVAL=30

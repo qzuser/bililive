@@ -1,0 +1,8 @@
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29
+httpx>=0.27
+websockets>=12.0
+brotli>=1.1
+# Windows 本机没装 ffmpeg 时可选装（自带 ffmpeg 二进制，容器环境无需安装）：
+# imageio-ffmpeg>=0.5
+
