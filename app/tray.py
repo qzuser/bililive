@@ -25,6 +25,9 @@ import time
 import urllib.request
 import webbrowser
 
+from . import config
+from . import log as app_log
+
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("BLR_PORT", "8000"))
 BASE = f"http://127.0.0.1:{PORT}"
@@ -51,8 +54,8 @@ def _start_server() -> None:
     import uvicorn
 
     from .main import app
-    cfg = uvicorn.Config(app, host=HOST, port=PORT,
-                         log_level=os.environ.get("BLR_LOG_LEVEL", "info"))
+    cfg = uvicorn.Config(app, host=HOST, port=PORT, log_level=config.LOG_LEVEL,
+                         log_config=None)  # 日志交由 root（控制台+文件），勿被 uvicorn 接管
     _server = uvicorn.Server(cfg)
     _server_thread = threading.Thread(target=_server.run, daemon=True)
     _server_thread.start()
@@ -145,13 +148,15 @@ def _run_console(log) -> int:
             time.sleep(0.5)
     except KeyboardInterrupt:
         log.info("收到 Ctrl+C，正在停止服务…")
+    if _server is not None and not _server.should_exit:
+        log.error("服务线程意外结束（非用户停止），详见日志文件 %s",
+                  config.LOG_FILE)
     _stop_server()
     return 0
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+    app_log.setup()
     log = logging.getLogger("tray")
     if _port_open():
         if sys.platform == "win32":

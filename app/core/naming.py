@@ -25,6 +25,8 @@ MACROS = ("roomId", "name", "title", "partIndex", "now")
 
 _TOKEN = re.compile(r"\{\{\s*([A-Za-z][A-Za-z0-9_]*)(\s*\|\s*[^{}]+?)?\s*\}\}")
 _UNSAFE_SEG = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+# Windows 保留设备名（CON/NUL/COM1…，含带扩展名形式），任意平台一律预防性加前缀
+_WIN_RESERVED = re.compile(r"(?i)(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$")
 _MAX_SEG_LEN = 120
 _MAX_DEPTH = 5
 
@@ -54,8 +56,8 @@ def validate(template: str) -> str:
         if m.group(2):
             _validate_filters(m.group(2).strip(), m.group(1))
     static = _TOKEN.sub("\x00", t)
-    if static.count("/") > _MAX_DEPTH:
-        raise TemplateError(f"子目录层级过多（上限 {_MAX_DEPTH} 层）")
+    if static.count("/") >= _MAX_DEPTH:
+        raise TemplateError(f"子目录层级过多（路径段上限 {_MAX_DEPTH} 级）")
     for seg in static.split("/"):
         if seg.replace("\x00", "").strip() == "..":
             raise TemplateError("模板静态部分不允许 .. 路径")
@@ -75,6 +77,10 @@ def _validate_filters(fchain: str, macro: str) -> None:
             raise TemplateError("date 过滤器仅用于 now 宏")
         if name in ("pad",) and macro not in ("partIndex", "roomId"):
             raise TemplateError("pad 过滤器仅用于 partIndex / roomId 宏")
+        if name in ("pad", "truncate") and ":" in f:
+            val = f.split(":", 1)[1].strip()
+            if not (val.isdigit() and 1 <= int(val) <= 9999):
+                raise TemplateError(f"{name} 参数需为 1-9999 的数字：{f}")
 
 
 def render(template: str, *, room_id: int, room_name: str, anchor_name: str,
@@ -123,6 +129,8 @@ def render(template: str, *, room_id: int, room_name: str, anchor_name: str,
             continue
         if seg == "..":
             raise TemplateError("渲染结果包含 ..，拒绝路径逃逸")
+        if _WIN_RESERVED.match(seg):
+            seg = "_" + seg
         segs.append(seg[:_MAX_SEG_LEN])
     if not segs:
         raise TemplateError("模板渲染结果为空（全部字符被清洗）")

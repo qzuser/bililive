@@ -15,6 +15,7 @@
 - **失败自愈**：流中断自动重新取址分段续录、弹幕服务器自动轮换重连、WBI 风控自动刷新密钥
 - **多平台运行**：Docker 部署到飞牛 NAS（fnOS）等容器环境，也可在 Windows 本机直接双击 `run_windows.bat` 运行（自动建虚拟环境、自动探测 ffmpeg），Linux/macOS 同样支持本地运行
 - **Windows 托盘默认常驻**：`run_windows.bat` 启动即在任务栏通知区显示粉色"B"托盘图标（无需任何额外安装），菜单可**打开网页界面、暂停/恢复监控、刷新直播间、退出程序**（退出会优雅收尾在录会话）
+- **文件日志**：控制台之外同步写入 `data/logs/app.log`（轮转，单文件 5MB × 3 份），含启动、监控、录制、弹幕与错误全链路；后台线程崩溃与 uvicorn 日志一并归集，报错时把该文件发来即可定位
 
 ## 快速开始（飞牛 NAS / Docker）
 
@@ -53,7 +54,11 @@ docker compose up -d --build
 - **刷新直播间**：不等轮询间隔，马上对所有房间做一轮开播检测并同步房间信息
 - **退出程序**：优雅停止服务（在录会话收尾落盘、弹幕连接正常断开）后退出
 
-托盘所需的 `pystray`/`pillow` 已列入 `requirements.txt`（仅 Windows 平台标记），第 2 步安装依赖时自动装好，**无需任何额外下载**；若因故缺失，程序会自动降级为纯控制台模式（Ctrl+C 停止），服务功能不受影响。已有实例在运行时再次启动不会重复占用端口，而是直接帮你打开网页。若想开机自启，可把该 bat 的快捷方式放入 `shell:startup`。
+托盘所需的 `pystray`/`pillow` 已列入 `requirements.txt`（仅 Windows 平台标记），第 2 步安装依赖时自动装好，**无需任何额外下载**；若因故缺失，程序会自动降级为纯控制台模式（Ctrl+C 停止），服务功能不受影响。已有实例在运行时再次启动不会重复占用端口，而是直接帮你打开网页。
+
+### 日志与排错
+
+无论托盘还是控制台模式，运行日志都会同步写入 **`data/logs/app.log`**（轮转，单文件 5MB，最多保留 3 份历史）。控制台窗口关闭、托盘后台运行时日志同样不丢。启动服务、监控轮询、录制分段、弹幕连接、报错堆栈以及后台线程的意外崩溃都会记录在此；窗口报错或行为异常时，把该文件发给我即可定位。日志级别可用环境变量 `BLR_LOG_LEVEL` 调整（默认 `info`，排错建议 `debug`）。若想开机自启，可把该 bat 的快捷方式放入 `shell:startup`。
 
 ## 本地运行（开发/调试）
 
@@ -97,6 +102,7 @@ docker run --rm -v "%CD%:/work" -e BLR_DATA_DIR=/work/data_e2e -e BLR_SPLIT_TEST
 ```
 data/
 ├── recorder.db                     # 房间配置 / 录制记录 / 设置
+├── logs/app.log                    # 运行日志（轮转 5MB×3，控制台/托盘均同步写入）
 └── recordings/room<房间号>/
     ├── 2026-09-26_201500_<标题>.flv        # 视频（FLV 原格式保留；该房间开启自动转 MP4 时为 .mp4）
     ├── 2026-09-26_201500_<标题>.xml        # 弹幕+互动事件 XML（<d>弹幕 / <sc>SC / <gift>礼物 / <guard>上舰，兼容 danmaku2ass）
@@ -142,6 +148,7 @@ app/
 ├── tray.py              # Windows 默认启动入口（起服务 + 托盘图标，非 Windows 自动转控制台模式）
 ├── config.py            # 环境变量与常量
 ├── db.py                # SQLite 数据层
+├── log.py               # 统一日志配置（控制台 + 文件轮转，线程崩溃归集）
 ├── bilibili/
 │   ├── api.py           # WBI 签名 / 房间信息 / 流地址 / 弹幕服务器
 │   └── danmaku.py       # 弹幕 WebSocket 协议客户端
@@ -163,6 +170,7 @@ app/
 | `BLR_HTTP_TIMEOUT` | `10` | B 站接口超时（秒） |
 | `BLR_FFMPEG` | `ffmpeg` | ffmpeg 可执行文件路径 |
 | `BLR_PORT` | `8000` | 服务端口（`app.tray` 入口读取；`uvicorn` 方式用 `--port`） |
+| `BLR_LOG_LEVEL` | `info` | 日志级别（`debug`/`info`/`warning`/`error`），同时控制控制台、`app.log` 与 uvicorn |
 
 ## 已知限制
 

@@ -174,12 +174,15 @@ async function loadRecordings() {
     completed: '<span class="badge done">已完成</span>',
     failed: '<span class="badge failed">失败</span>',
   };
+  // 文件名可含 #&? 等字符（模板宏），须按路径段编码，否则下载链接错位
+  const fileHref = (u) => "/files/" + String(u).split("/")
+    .map(encodeURIComponent).join("/");
   for (const rec of data.items) {
     const dur = rec.end_ts ? rec.end_ts - rec.start_ts : null;
     const links = [];
-    if (rec.video_url) links.push(`<a href="/files/${rec.video_url}" download>视频</a>`);
-    if (rec.danmaku_url) links.push(`<a href="/files/${rec.danmaku_url}" download>弹幕XML</a>`);
-    if (rec.events_url) links.push(`<a href="/files/${rec.events_url}" download>事件</a>`);
+    if (rec.video_url) links.push(`<a href="${fileHref(rec.video_url)}" download>视频</a>`);
+    if (rec.danmaku_url) links.push(`<a href="${fileHref(rec.danmaku_url)}" download>弹幕XML</a>`);
+    if (rec.events_url) links.push(`<a href="${fileHref(rec.events_url)}" download>事件</a>`);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${rec.id}</td>

@@ -237,6 +237,22 @@ except _nm.TemplateError:
 check("模板-未知宏与误用date均拒绝", _v2 and _v3)
 check("模板-合法保存通过", _nm.validate('{{ roomId }}/{{ name }}_{{ partIndex | pad:3 }}')
       == "{{ roomId }}/{{ name }}_{{ partIndex | pad:3 }}")
+_r3 = _nm.render("{{ title }}", room_id=1, room_name="CON", anchor_name="",
+                 part_index=1, start_time=_t0)
+check("模板-Windows保留名转义", _r3 == "_CON", _r3)
+try:
+    _nm.validate("{{ title | truncate:abc }}")
+    _v4 = False
+except _nm.TemplateError:
+    _v4 = True
+check("模板-非数字过滤器参数拒绝", _v4)
+check("模板-深度边界", _nm.validate("a/b/c/d/{{ roomId }}") == "a/b/c/d/{{ roomId }}")
+try:
+    _nm.validate("a/b/c/d/e/{{ roomId }}")
+    _v5 = False
+except _nm.TemplateError:
+    _v5 = True
+check("模板-超深层级拒绝", _v5)
 
 _db.set_setting("filename_format", "{{ roomId }}_{{ title }}")
 s2 = RecordingSession.__new__(RecordingSession)
@@ -275,6 +291,12 @@ with TestClient(_main.app) as tc:
     r_bad = tc.put("/api/settings", json={"filename_format": "{{ bogus }}"})
     check("设置API-坏模板返回400", r_bad.status_code == 400,
           r_bad.json().get("detail", "")[:60] if r_bad.status_code == 400 else r_bad.text[:60])
+    r_bad2 = tc.put("/api/settings",
+                    json={"filename_format": "{{ title | truncate:abc }}"})
+    check("设置API-非数字过滤器参数返回400(而非500)", r_bad2.status_code == 400,
+          r_bad2.json().get("detail", "")[:60] if r_bad2.status_code == 400 else r_bad2.text[:60])
+    _log_ok = _cfg.LOG_FILE.exists() and _cfg.LOG_FILE.stat().st_size > 0
+    check("日志-文件已写入", _log_ok, str(_cfg.LOG_FILE))
     r_ok = tc.put("/api/settings", json={"filename_format": "{{ roomId }}/{{ name }}"})
     g = tc.get("/api/settings").json()
     check("设置API-模板保存回读", r_ok.status_code == 200

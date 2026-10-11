@@ -6,32 +6,24 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, db
+from . import config, db, log as app_log
 from .api.routes import router as api_router
 from .core.monitor import MonitorManager
 
 WEB_DIR = Path(__file__).parent / "web"
 
 
-def _setup_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _setup_logging()
+    app_log.setup()
     config.ensure_dirs()
     db.init()
     manager = MonitorManager()
     app.state.manager = manager
     await manager.start_all()
     logging.getLogger("main").info(
-        "%s v%s started, data dir: %s", config.APP_NAME, config.VERSION,
-        config.DATA_DIR)
+        "%s v%s started, data dir: %s, log: %s", config.APP_NAME,
+        config.VERSION, config.DATA_DIR, config.LOG_FILE)
     try:
         yield
     finally:

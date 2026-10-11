@@ -2,11 +2,14 @@ import os
 from pathlib import Path
 
 APP_NAME = "BiliLiveRecorder"
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 
 DATA_DIR = Path(os.environ.get("BLR_DATA_DIR", "./data")).resolve()
 DB_PATH = DATA_DIR / "recorder.db"
 RECORDINGS_DIR = DATA_DIR / "recordings"
+LOG_DIR = DATA_DIR / "logs"
+LOG_FILE = LOG_DIR / "app.log"
+LOG_LEVEL = os.environ.get("BLR_LOG_LEVEL", "info").strip().lower()
 
 POLL_INTERVAL = int(os.environ.get("BLR_POLL_INTERVAL", "30"))
 HTTP_TIMEOUT = float(os.environ.get("BLR_HTTP_TIMEOUT", "10"))
