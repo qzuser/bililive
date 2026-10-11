@@ -36,6 +36,8 @@ docker compose up -d --build
 
 ## Windows 直接运行（不依赖 Docker）
 
+> 不想克隆仓库？到 [Releases 页面](https://github.com/qzuser/bililive/releases/latest) 下载 `bililive-windows-v1.0.0.zip`，解压后按下面步骤双击运行即可。
+
 双击（或在 cmd 中运行）项目根目录的 `run_windows.bat`：脚本会自动创建 `.venv`、安装依赖、启动服务，随后浏览器打开 `http://127.0.0.1:8000` 即可使用。
 
 - **ffmpeg 自动解析**：优先使用 `BLR_FFMPEG` 环境变量 → PATH 中的 `ffmpeg` → 自动安装/使用 `imageio-ffmpeg` 自带的二进制（bat 脚本会在检测不到 PATH ffmpeg 时自动装 `imageio-ffmpeg`），三者皆无才报错
