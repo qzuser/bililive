@@ -1,6 +1,8 @@
-"""Windows 托盘模式：后台运行录制服务，托盘图标提供快捷操作。
+"""Windows 默认启动方式：启动服务并在任务栏托盘区显示图标。
 
-用法：双击 run_windows_tray.bat，或在项目根目录执行 ``pythonw -m app.tray``。
+用法：双击 run_windows.bat（依赖随 requirements.txt 自动安装，无需额外下载），
+或手动执行 ``python -m app.tray``。非 Windows 或未安装 pystray 时自动转为
+控制台模式（Ctrl+C 停止）。
 
 托盘菜单：
 - 打开网页界面：浏览器打开管理页
@@ -49,7 +51,8 @@ def _start_server() -> None:
     import uvicorn
 
     from .main import app
-    cfg = uvicorn.Config(app, host=HOST, port=PORT, log_level="warning")
+    cfg = uvicorn.Config(app, host=HOST, port=PORT,
+                         log_level=os.environ.get("BLR_LOG_LEVEL", "info"))
     _server = uvicorn.Server(cfg)
     _server_thread = threading.Thread(target=_server.run, daemon=True)
     _server_thread.start()
@@ -127,36 +130,57 @@ def build_menu():
     )
 
 
+def _stop_server() -> None:
+    if _server is not None:
+        _server.should_exit = True  # 触发 lifespan 收尾：在录会话优雅停录
+        if _server_thread is not None:
+            _server_thread.join(timeout=60)
+
+
+def _run_console(log) -> int:
+    """无托盘环境（非 Windows / 未装 pystray）的控制台模式：Ctrl+C 停止。"""
+    log.info("服务已启动（控制台模式）：%s，按 Ctrl+C 停止", BASE)
+    try:
+        while _server_thread is not None and _server_thread.is_alive():
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        log.info("收到 Ctrl+C，正在停止服务…")
+    _stop_server()
+    return 0
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     log = logging.getLogger("tray")
-    if sys.platform != "win32":
-        print("托盘模式仅支持 Windows；本平台请直接运行 "
-              "python -m uvicorn app.main:app")
-        return 1
     if _port_open():
-        # 服务已在运行（控制台或另一托盘实例）：不重复启动，直接打开界面
-        webbrowser.open(BASE)
-        log.info("service already running at %s, opened page", BASE)
-        return 0
-    _start_server()
-    if not _wait_ready():
-        if _server is not None:
-            _server.should_exit = True
+        if sys.platform == "win32":
+            # 服务已在运行（另一托盘实例或控制台版）：不重复启动，直接打开界面
+            webbrowser.open(BASE)
+            log.info("service already running at %s, opened page", BASE)
+            return 0
         _msg("启动失败", f"无法监听端口 {PORT}，可能被其他程序占用。")
         return 1
-    import pystray
-    icon = pystray.Icon("bililive", _make_image(),
-                        f"B站直播录制系统（{BASE}）", build_menu())
+    _start_server()
+    if not _wait_ready():
+        _stop_server()
+        _msg("启动失败", f"无法监听端口 {PORT}，可能被其他程序占用。")
+        return 1
+    if sys.platform != "win32":
+        return _run_console(log)
+    try:
+        import pystray
+        icon = pystray.Icon("bililive", _make_image(),
+                            f"B站直播录制系统（{BASE}）", build_menu())
+    except ImportError:
+        log.warning("未安装 pystray/Pillow，转为控制台模式（无托盘图标）。"
+                    "可运行 pip install -r requirements.txt 补齐后重启")
+        return _run_console(log)
     log.info("tray started, service at %s", BASE)
     try:
         icon.run()  # 阻塞直到菜单"退出程序"或注销
     finally:
-        if _server is not None:
-            _server.should_exit = True  # 触发 lifespan 收尾：在录会话优雅停录
-            if _server_thread is not None:
-                _server_thread.join(timeout=60)
+        _stop_server()
     return 0
 
 

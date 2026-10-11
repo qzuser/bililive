@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 APP_NAME = "BiliLiveRecorder"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 DATA_DIR = Path(os.environ.get("BLR_DATA_DIR", "./data")).resolve()
 DB_PATH = DATA_DIR / "recorder.db"
