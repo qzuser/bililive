@@ -11,6 +11,7 @@ from xml.sax.saxutils import quoteattr
 from .. import config, db
 from ..bilibili.api import BiliLiveAPI, StreamCandidate
 from ..bilibili.danmaku import DanmakuClient
+from . import naming
 from .recorder import VideoRecorder, remux_flv_to_mp4
 
 log = logging.getLogger("session")
@@ -28,10 +29,12 @@ class RecordingSession:
     def __init__(self, api: BiliLiveAPI, room_id: int, title: str,
                  candidate: StreamCandidate, live_start_time: float,
                  record_danmaku: bool, auto_convert_mp4: bool,
-                 split_mode: str = "none", split_arg: int = 0):
+                 split_mode: str = "none", split_arg: int = 0,
+                 anchor_name: str = ""):
         self.api = api
         self.room_id = room_id
         self.title = title
+        self.anchor_name = anchor_name
         self.candidate = candidate
         self.live_start_time = live_start_time  # 服务器开播时间戳（秒）
         self.record_danmaku = record_danmaku
@@ -73,9 +76,19 @@ class RecordingSession:
         return headers
 
     def _segment_paths(self):
-        stamp = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d_%H%M%S")
-        stem = f"{stamp}_{safe_filename(self.title)}"
-        if self._seg_index > 1:
+        fmt = db.get_setting("filename_format", "").strip() \
+            or naming.DEFAULT_TEMPLATE
+        kw = dict(room_id=self.room_id, room_name=self.title,
+                  anchor_name=self.anchor_name, part_index=self._seg_index,
+                  start_time=datetime.fromtimestamp(time.time()))
+        used = fmt
+        try:
+            stem = naming.render(fmt, **kw)
+        except naming.TemplateError as e:
+            log.warning("room %s 文件名模板无效（%s），回退默认", self.room_id, e)
+            used = naming.DEFAULT_TEMPLATE
+            stem = naming.render(used, **kw)
+        if self._seg_index > 1 and not naming.uses_part_index(used):
             stem = f"{stem}_p{self._seg_index:02d}"
         return (self.dir / f"{stem}.flv", self.dir / f"{stem}.xml",
                 self.dir / f"{stem}.events.jsonl", self.dir / f"{stem}.mp4")
@@ -85,6 +98,7 @@ class RecordingSession:
         (self.flv_path, self.xml_path, self.events_path,
          self.mp4_path) = self._segment_paths()
         self.dir.mkdir(parents=True, exist_ok=True)
+        self.flv_path.parent.mkdir(parents=True, exist_ok=True)
         self.segment_started_at = time.time()
         self.danmaku_count = 0
         self.recording_id = db.add_recording(

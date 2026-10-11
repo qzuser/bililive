@@ -213,6 +213,7 @@ class MonitorManager:
             auto_convert_mp4=bool(row.get("auto_convert_mp4", 0)),
             split_mode=row.get("split_mode", "none"),
             split_arg=int(row.get("split_arg", 0) or 0),
+            anchor_name=row.get("name", ""),
         )
         try:
             await session.start()

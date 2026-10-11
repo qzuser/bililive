@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from .. import config, db
 from ..bilibili.api import BiliAPIError, BiliLiveAPI
+from ..core import naming
 from ..core.monitor import MonitorManager
 
 router = APIRouter(prefix="/api")
@@ -90,6 +91,7 @@ class SettingsPut(BaseModel):
     poll_interval: Optional[int] = None
     default_split_mode: Optional[str] = None
     default_split_arg: Optional[int] = None
+    filename_format: Optional[str] = None
 
 
 class CookieCheck(BaseModel):
@@ -258,6 +260,8 @@ async def get_settings():
                                             str(config.POLL_INTERVAL))),
         "default_split_mode": mode,
         "default_split_arg": arg,
+        "filename_format": db.get_setting("filename_format", ""),
+        "filename_format_default": naming.DEFAULT_TEMPLATE,
     }
 
 
@@ -280,6 +284,14 @@ async def put_settings(request: Request, body: SettingsPut):
             else cur_arg)
         db.set_setting("default_split_mode", mode)
         db.set_setting("default_split_arg", str(arg))
+    if body.filename_format is not None:
+        fmt = body.filename_format.strip()
+        if fmt:
+            try:
+                naming.validate(fmt)
+            except naming.TemplateError as e:
+                raise HTTPException(400, f"文件名模板无效：{e}")
+        db.set_setting("filename_format", fmt)
     return {"ok": True}
 
 

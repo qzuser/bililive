@@ -89,6 +89,10 @@
         <input id="set-default-split-arg" type="number" min="1" style="width:90px" placeholder="值">
       </span>
     </label>
+    <label>录制文件名模板（留空恢复默认；参考录播姬的 {{ 宏 }} 语法）
+      <input id="set-filename-format" type="text" style="width:100%" placeholder="默认模板将显示在此处">
+      <span class="sub">可用宏：roomId 房间号 · name 主播昵称 · title 直播标题 · partIndex 分段序号 · now 开始时间（需过滤器，如 {{ now | date: "%Y%m%d-%H%M%S" }}）；支持 / 建子目录；扩展名自动添加</span>
+    </label>
     <label class="chk"><input id="set-daemon-warn" type="checkbox" disabled> （预留）开播站内提醒</label>
     <div class="row end">
       <button id="btn-save-settings" class="btn primary">保存</button>

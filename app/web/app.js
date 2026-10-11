@@ -224,6 +224,8 @@ $("#btn-settings").addEventListener("click", async () => {
     $("#set-poll-interval").value = s.poll_interval || 30;
     $("#set-default-split-mode").value = s.default_split_mode || "none";
     $("#set-default-split-arg").value = s.default_split_arg || 30;
+    $("#set-filename-format").value = s.filename_format || "";
+    $("#set-filename-format").placeholder = s.filename_format_default || "";
   } catch (e) { toast(e.message, true); }
 });
 $("#btn-close-settings").addEventListener("click", () => $("#modal-settings").classList.add("hidden"));
@@ -248,6 +250,7 @@ $("#btn-save-settings").addEventListener("click", async () => {
       cookie: $("#set-cookie").value.trim(),
       poll_interval: Number($("#set-poll-interval").value) || 30,
       default_split_mode: mode,
+      filename_format: $("#set-filename-format").value.trim(),
     };
     if (mode !== "none") body.default_split_arg = Number($("#set-default-split-arg").value) || 0;
     await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });

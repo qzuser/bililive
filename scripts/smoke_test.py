@@ -205,7 +205,71 @@ szs.flv_path.write_bytes(b"0" * (1024 * 1024 + 1))
 check("分段-按大小到期触发", szs._split_due())
 szs.flv_path.unlink()
 
+# ---------- 文件名模板 ----------
+import re as _re  # noqa: E402
+from datetime import datetime as _dt  # noqa: E402
+from app.core import naming as _nm  # noqa: E402
+
+_t0 = _dt(2026, 10, 11, 7, 38, 12)
+_r = _nm.render(_nm.DEFAULT_TEMPLATE, room_id=23058, room_name="标题甲",
+                anchor_name="主播B", part_index=1, start_time=_t0)
+check("模板-默认渲染", _r == "2026-10-11_073812_标题甲", _r)
+_r2 = _nm.render('{{ roomId }}/{{ name | default:unknown }}/{{ title | truncate:4 }}',
+                 room_id=23058, room_name="abcdEF", anchor_name="",
+                 part_index=2, start_time=_t0)
+check("模板-子目录+过滤器", _r2 == "23058/unknown/abcd", _r2)
+try:
+    _nm.validate("../{{ roomId }}")
+    _v1 = False
+except _nm.TemplateError:
+    _v1 = True
+check("模板-校验拒绝 .. 路径", _v1)
+try:
+    _nm.validate("{{ foo }}")
+    _v2 = False
+except _nm.TemplateError:
+    _v2 = True
+try:
+    _nm.validate('{{ title | date: "%Y" }}')
+    _v3 = False
+except _nm.TemplateError:
+    _v3 = True
+check("模板-未知宏与误用date均拒绝", _v2 and _v3)
+check("模板-合法保存通过", _nm.validate('{{ roomId }}/{{ name }}_{{ partIndex | pad:3 }}')
+      == "{{ roomId }}/{{ name }}_{{ partIndex | pad:3 }}")
+
+_db.set_setting("filename_format", "{{ roomId }}_{{ title }}")
+s2 = RecordingSession.__new__(RecordingSession)
+s2.room_id, s2.title, s2.anchor_name = 23058, "演示", "B"
+s2._seg_index = 2
+s2.dir = Path(_cfg.DATA_DIR)
+_f, _x, _e, _m = s2._segment_paths()
+check("模板-会话套用且非partIndex模板自动补_pNN",
+      _f.name == "23058_演示_p02.flv" and _x.name == "23058_演示_p02.xml", _f.name)
+_db.set_setting("filename_format", "{{ nope }}")
+_f2 = s2._segment_paths()[0]
+check("模板-运行期坏模板回退默认", _re.match(
+    r"^\d{4}-\d{2}-\d{2}_\d{6}_演示_p02\.flv$", _f2.name) is not None, _f2.name)
+_db.set_setting("filename_format", "")
+
 _db.close()
+
+# ---------- 文件名模板 API ----------
+from fastapi.testclient import TestClient  # noqa: E402
+import app.main as _main  # noqa: E402
+
+with TestClient(_main.app) as tc:
+    r_bad = tc.put("/api/settings", json={"filename_format": "{{ bogus }}"})
+    check("设置API-坏模板返回400", r_bad.status_code == 400,
+          r_bad.json().get("detail", "")[:60] if r_bad.status_code == 400 else r_bad.text[:60])
+    r_ok = tc.put("/api/settings", json={"filename_format": "{{ roomId }}/{{ name }}"})
+    g = tc.get("/api/settings").json()
+    check("设置API-模板保存回读", r_ok.status_code == 200
+          and g["filename_format"] == "{{ roomId }}/{{ name }}")
+    tc.put("/api/settings", json={"filename_format": ""})
+    g2 = tc.get("/api/settings").json()
+    check("设置API-空值恢复默认", g2["filename_format"] == ""
+          and g2["filename_format_default"] == _nm.DEFAULT_TEMPLATE)
 
 # ---------- 3. 真实接口（只读） ----------
 print("== live api (read-only) ==")
