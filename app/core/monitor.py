@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from .. import config, db
@@ -23,6 +23,7 @@ class RoomRuntime:
     last_check: float = 0.0
     offline_count: int = 0
     stop_requested: bool = False
+    wake: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 class MonitorManager:
@@ -30,6 +31,7 @@ class MonitorManager:
         self.api = BiliLiveAPI(cookie=db.get_setting("cookie"))
         self.rooms: dict[int, RoomRuntime] = {}
         self.poll_interval = self._load_poll_interval()
+        self.paused = False
         self._lock = asyncio.Lock()
 
     def _load_poll_interval(self) -> int:
@@ -47,6 +49,20 @@ class MonitorManager:
 
     def update_poll_interval(self, seconds: int) -> None:
         self.poll_interval = max(10, min(300, seconds))
+
+    def set_paused(self, paused: bool) -> None:
+        """暂停只停止“自动开新录”，已在录的分段不受影响。"""
+        self.paused = paused
+        if not paused:
+            for rt in self.rooms.values():
+                rt.wake.set()
+
+    async def refresh_all(self) -> None:
+        """立即触发一轮房间检查（托盘/界面的“刷新直播间”）。"""
+        for room in db.list_rooms():
+            self.spawn(room["room_id"])
+        for rt in list(self.rooms.values()):
+            rt.wake.set()
 
     # ---------- 房间任务管理 ----------
 
@@ -120,7 +136,12 @@ class MonitorManager:
                     rt.status = "error"
                     rt.error = f"{type(e).__name__}: {e}"
                     log.warning("room %s tick error: %s", room_id, e)
-                await asyncio.sleep(self.poll_interval)
+                try:
+                    await asyncio.wait_for(rt.wake.wait(),
+                                           timeout=self.poll_interval)
+                except asyncio.TimeoutError:
+                    pass
+                rt.wake.clear()
         except asyncio.CancelledError:
             pass
         finally:
@@ -179,6 +200,9 @@ class MonitorManager:
             rt.stop_requested = False
             return
 
+        if self.paused:
+            rt.status = "idle"
+            return
         if not row["enabled"]:
             rt.status = "idle"
             return

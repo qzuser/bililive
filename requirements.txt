@@ -3,6 +3,9 @@ uvicorn[standard]>=0.29
 httpx>=0.27
 websockets>=12.0
 brotli>=1.1
+# 托盘模式（仅 Windows，python -m app.tray）；Linux/Docker 会自动跳过：
+pystray>=0.19; sys_platform == "win32"
+pillow>=10.0; sys_platform == "win32"
 # Windows 本机没装 ffmpeg 时可选装（自带 ffmpeg 二进制，容器环境无需安装）：
 # imageio-ffmpeg>=0.5
 

@@ -252,6 +252,19 @@ check("模板-运行期坏模板回退默认", _re.match(
     r"^\d{4}-\d{2}-\d{2}_\d{6}_演示_p02\.flv$", _f2.name) is not None, _f2.name)
 _db.set_setting("filename_format", "")
 
+# ---------- 托盘模块 ----------
+import app.tray as _tray  # noqa: E402
+check("托盘模块可导入（pystray 非硬依赖）",
+      hasattr(_tray, "main") and hasattr(_tray, "build_menu"))
+try:
+    import pystray  # noqa: F401
+    _img = _tray._make_image()
+    _menu = _tray.build_menu()
+    check("托盘图标与菜单构建", _img.size == (64, 64) and len(_menu.items) == 5)
+except ImportError:
+    check("托盘依赖跳过（非 win32 不装 pystray/Pillow）", True,
+          "容器内无托盘依赖属预期")
+
 _db.close()
 
 # ---------- 文件名模板 API ----------
@@ -270,6 +283,17 @@ with TestClient(_main.app) as tc:
     g2 = tc.get("/api/settings").json()
     check("设置API-空值恢复默认", g2["filename_format"] == ""
           and g2["filename_format_default"] == _nm.DEFAULT_TEMPLATE)
+
+    # ---------- 托盘/总控 API ----------
+    r = tc.post("/api/monitor/pause")
+    s = tc.get("/api/status").json()
+    check("API-暂停监控", r.status_code == 200 and s["paused"] is True)
+    r = tc.post("/api/monitor/resume")
+    s = tc.get("/api/status").json()
+    check("API-恢复监控", r.status_code == 200 and s["paused"] is False)
+    r = tc.post("/api/refresh")
+    check("API-刷新直播间", r.status_code == 200 and r.json().get("ok"),
+          "" if r.status_code == 200 else r.text[:80])
 
 # ---------- 3. 真实接口（只读） ----------
 print("== live api (read-only) ==")

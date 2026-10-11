@@ -114,6 +114,7 @@ async def get_status(request: Request):
         "disk_total": usage.total,
         "poll_interval": mgr.poll_interval,
         "cookie_set": bool(db.get_setting("cookie")),
+        "paused": mgr.paused,
     }
 
 
@@ -199,6 +200,27 @@ async def stop_record(request: Request, room_id: int):
     mgr = manager(request)
     mgr.force_stop(room_id)
     return {"ok": True}
+
+
+# ---------- 监控总控（托盘/快捷操作） ----------
+
+@router.post("/monitor/pause")
+async def pause_monitor(request: Request):
+    manager(request).set_paused(True)
+    return {"ok": True, "paused": True}
+
+
+@router.post("/monitor/resume")
+async def resume_monitor(request: Request):
+    manager(request).set_paused(False)
+    return {"ok": True, "paused": False}
+
+
+@router.post("/refresh")
+async def refresh_rooms(request: Request):
+    mgr = manager(request)
+    await mgr.refresh_all()
+    return {"ok": True, "rooms": len(mgr.rooms)}
 
 
 # ---------- recordings ----------

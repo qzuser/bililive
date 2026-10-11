@@ -305,7 +305,7 @@ async function loadStatus() {
   try {
     const s = await api("/api/status");
     $("#status-bar").textContent =
-      `监控 ${s.rooms_total} · 直播中 ${s.living} · 录制中 ${s.recording} · 磁盘剩余 ${fmtSize(s.disk_free)}`;
+      `监控 ${s.rooms_total}${s.paused ? "（已暂停）" : ""} · 直播中 ${s.living} · 录制中 ${s.recording} · 磁盘剩余 ${fmtSize(s.disk_free)}`;
   } catch { $("#status-bar").textContent = "服务连接失败"; }
 }
 
