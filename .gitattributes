@@ -1,0 +1,10 @@
+# 默认按内容自动处理换行
+* text=auto
+
+# Windows 批处理必须用 CRLF，否则中文 Windows 上 cmd 解析报错
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 明确保持 LF 的脚本/配置
+Dockerfile text eol=lf
+*.sh text eol=lf

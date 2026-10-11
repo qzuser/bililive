@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 rem B站直播录制系统 - Windows 一键启动（默认含托盘图标）
 rem 需要 Python 3.11+；ffmpeg 可选（未安装时自动使用 imageio-ffmpeg 自带二进制）
 rem 托盘依赖 pystray/pillow 已列入 requirements.txt，随第 2 步自动安装，无需额外下载
